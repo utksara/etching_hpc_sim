@@ -4,6 +4,7 @@ from scipy.optimize import minimize_scalar
 from types import FunctionType
 import matplotlib.animation as animation
 from scipy.interpolate import make_interp_spline, CubicSpline
+from lib.point_methods import estimate_normals_2d 
 
 def to_angular_coordinates(points, centre, N):
     angular_coordinates = np.zeros((N, 2))
@@ -53,16 +54,17 @@ def get_etch_flux(point, a = 0.1):
     return np.array([x_comp, y_comp])
 
 def get_normal(points, N):
-    dx = np.ones(N) 
-    dy = np.zeros(N) 
-    dx[1:N-1] = (points[2:,0] - points[:N-2,0])
-    dy[1:N-1] = (points[2:,1] - points[:N-2,1])
-    dd = np.sqrt(dx**2 + dy**2)
-    norm = np.zeros((N, 2))
-    theta = np.arcsin(dy/dd) + np.pi/2
-    norm[:,0] = np.cos(theta)
-    norm[:,1] = np.sin(np.pi - theta)
-    return norm
+    # dx = np.ones(N) 
+    # dy = np.zeros(N) 
+    # dx[1:N-1] = (points[2:,0] - points[:N-2,0])
+    # dy[1:N-1] = (points[2:,1] - points[:N-2,1])
+    # dd = np.sqrt(dx**2 + dy**2)
+    # norm = np.zeros((N, 2))
+    # theta = np.arcsin(dy/dd) + np.pi/2
+    # norm[:,0] = np.cos(theta)
+    # norm[:,1] = np.sin(np.pi - theta)
+    # return norm
+    return estimate_normals_2d(points, k = 4)
 
 def get_tangent(points, N):
     dx = np.ones(N) 
