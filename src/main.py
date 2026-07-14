@@ -5,6 +5,7 @@ from types import FunctionType
 import matplotlib.animation as animation
 from scipy.interpolate import make_interp_spline, CubicSpline
 from lib.point_methods import estimate_normals_2d 
+import math
 
 def to_angular_coordinates(points, centre, N):
     angular_coordinates = np.zeros((N, 2))
@@ -54,17 +55,24 @@ def get_etch_flux(point, a = 0.1):
     return np.array([x_comp, y_comp])
 
 def get_normal(points, N):
-    # dx = np.ones(N) 
-    # dy = np.zeros(N) 
-    # dx[1:N-1] = (points[2:,0] - points[:N-2,0])
-    # dy[1:N-1] = (points[2:,1] - points[:N-2,1])
-    # dd = np.sqrt(dx**2 + dy**2)
-    # norm = np.zeros((N, 2))
-    # theta = np.arcsin(dy/dd) + np.pi/2
-    # norm[:,0] = np.cos(theta)
-    # norm[:,1] = np.sin(np.pi - theta)
-    # return norm
-    return estimate_normals_2d(points, k = 4)
+
+    # task fix thsi normal function which is not giving normal in all cases, dont use anything fanc
+    # just simple calculation using two neightbouring ppoints, eessentially just fin
+    dx = np.ones(N) 
+    dy = np.zeros(N) 
+    dx[1:N-1] = (points[2:,0] - points[:N-2,0])
+    dy[1:N-1] = (points[2:,1] - points[:N-2,1])
+    dd = np.sqrt(dx**2 + dy**2)
+    norm = np.zeros((N, 2))
+    # theta_asin = np.arcsin(dy/dd)
+    # theta_acos = np.arcsin(dx/dd)
+
+    theta = np.arctan2(dy, dx) + np.pi/2
+    norm[:,0] = np.cos(theta)
+    norm[:,1] = np.sin(theta)
+    # print(f"norm avg {norm[10,:]}, norm pca {estimate_normals_2d(points, k = 4)[10,:]}")
+    return norm
+    # return -estimate_normals_2d(points, k = 2)
 
 def get_tangent(points, N):
     dx = np.ones(N) 
@@ -149,9 +157,11 @@ def get_etch_rate(point_array, time):
     N = point_array.shape[0]
     p_norm = get_normal(point_array, N)
     removal_rate = np.zeros((N, 2))
+    offset_vec = np.array([0,1])
+    offset_cof = np.exp(-point_array[:,0]**2)
     for i in range(0, N):
-        # removal_rate[i, :] = np.linalg.norm(get_etch_flux(point_array[i, :])) * p_norm[i, :]
-        removal_rate[i, :] = p_norm[i, :]
+        removal_rate[i, :] = np.linalg.norm(get_etch_flux(point_array[i, :])) * ((1 - offset_cof[i])*p_norm[i, :] + offset_cof[i]*offset_vec)
+        # removal_rate[i, :] = p_norm[i, :]
     removal_rate[[0, 1, N-2, N-1], :] = 0
     return removal_rate
 
@@ -166,7 +176,7 @@ def get_sputter_rate(point_array, time):
 
 
 if __name__ == "__main__":
-    N = 31
+    N = 81
     points = get_plane_points(N, 0.1)
     p_norm = get_normal(points, N)
 
@@ -176,11 +186,14 @@ if __name__ == "__main__":
     for t in range(0, Nt):
         points = UpdateMethod.implicit_update(points, get_etch_rate, t, dt)
         # points = track_surface(points)
+
         points = re_distribute_points(points, N)
         
         temporaral_data.append(points.copy())
         
     def animate(temporaral_data):
+
+        # task : also plot the normal vector using get_normal function for each point in animation
         # Set up the plot afor animation
         fig, ax = plt.subplots(figsize=(8, 6))
         # Calculate limits based on all temporal data to keep the view stable
@@ -198,17 +211,42 @@ if __name__ == "__main__":
         # ax.grid(True)
 
         line, = ax.plot([], [], 'b-o', lw=2, markersize=3, label="Etch front")
+        
+        # Initialize quiver using first frame's points to avoid matplotlib warnings
+        init_points = temporaral_data[0]
+        init_norms = get_normal(init_points, init_points.shape[0])
+        quiver = ax.quiver(
+            init_points[:, 0], 
+            1 - init_points[:, 1], 
+            init_norms[:, 0], 
+            -init_norms[:, 1], 
+            color='r', 
+            scale=15, 
+            width=0.003, 
+            headwidth=3, 
+            headlength=4, 
+            label="Normal vectors"
+        )
+        
         ax.legend()
 
         def init():
             line.set_data([], [])
-            return line,
+            quiver.set_offsets(np.column_stack((init_points[:, 0], 1 - init_points[:, 1])))
+            quiver.set_UVC(np.zeros(init_points.shape[0]), np.zeros(init_points.shape[0]))
+            return line, quiver
 
         def update(frame):
             current_points = temporaral_data[frame]
+            N_pts = current_points.shape[0]
+            norms = get_normal(current_points, N_pts)
+            
             line.set_data(current_points[:, 0], 1 - current_points[:, 1])
-            ax.set_title(f"Etching Simulation - Step {frame + 1}/100")
-            return line,
+            quiver.set_offsets(np.column_stack((current_points[:, 0], 1 - current_points[:, 1])))
+            quiver.set_UVC(norms[:, 0], -norms[:, 1])
+            
+            ax.set_title(f"Etching Simulation - Step {frame + 1}/{len(temporaral_data)}")
+            return line, quiver
 
         # Create the animation
         ani = animation.FuncAnimation(fig, update, frames=len(temporaral_data),
