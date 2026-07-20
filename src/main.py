@@ -174,24 +174,7 @@ def get_sputter_rate(point_array, time):
     removal_rate[[0, 1, N-2, N-1], :] = 0
     return removal_rate  
 
-
-if __name__ == "__main__":
-    N = 81
-    points = get_plane_points(N, 0.1)
-    p_norm = get_normal(points, N)
-
-    temporaral_data = []
-    Nt = 51
-    dt = 1/Nt
-    for t in range(0, Nt):
-        points = UpdateMethod.implicit_update(points, get_etch_rate, t, dt)
-        # points = track_surface(points)
-
-        points = re_distribute_points(points, N)
-        
-        temporaral_data.append(points.copy())
-        
-    def animate(temporaral_data):
+def animate(temporaral_data):
 
         # task : also plot the normal vector using get_normal function for each point in animation
         # Set up the plot afor animation
@@ -261,5 +244,22 @@ if __name__ == "__main__":
             print(f"Could not save animation: {e}")
 
         plt.close(fig)
+
+if __name__ == "__main__":
+    N = 81
+    points = get_plane_points(N, 0.1)
+    p_norm = get_normal(points, N)
+
+    temporaral_data = []
+    Nt = 51
+    dt = 1/Nt
+    for t in range(0, Nt):
+        points = UpdateMethod.implicit_update(points, get_etch_rate, t, dt)
+        # points = track_surface(points)
+
+        points = re_distribute_points(points, N)
+        
+        temporaral_data.append(points.copy())
+        
         
     animate(temporaral_data)
